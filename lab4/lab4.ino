@@ -20,7 +20,27 @@ void loop()
 {
   analogValue = analogRead(lightSensor);
   lcd.setCursor(0,0);
-  lcd.print(analogValue);
+  if(analogValue <= 25)
+  {
+    lcd.print("Dark");
+  }
+  else if(analogValue <= 50)
+  {
+    lcd.print("partially dark");
+  }
+  else if(analogValue <= 75)
+  {
+    lcd.print("medium");
+  }
+  else if(analogValue <= 100)
+  {
+    lcd.print("partially light");
+  }
+  else
+  {
+    lcd.print("fully lit");
+  }
+  
 
   // delay at the end of the full loop:
   delay(500);
