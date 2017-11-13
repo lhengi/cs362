@@ -14,13 +14,16 @@ void setup() {
   lcd.begin(16, 2);
   pinMode(interruptPin,INPUT_PULLUP);
   pinMode(comeback,INPUT);
-  attachInterrupt(digitalPinToInterrupt(interruptPin),hold,CHANGE);
+  attachInterrupt(digitalPinToInterrupt(3),start_again,CHANGE);
+  attachInterrupt(digitalPinToInterrupt(2),stop_setTo0,CHANGE);
   
 }
 int button_val = 0;
-int first = 0
+int first = 0;
 void loop()
 {
+  if(button_val != 1)
+  {
   lcd.setCursor(0,0);
   lcd.print("We have been wai");
   lcd.setCursor(0,1);
@@ -44,19 +47,27 @@ void loop()
   
    //lcd.print(count);
    count++;
-   delay(1000);
-  
-
-  // delay at the end of the full loop:
-  delay(500);
+  }
+  else
+  {
+    lcd.setCursor(0,0);
+    lcd.print("Interrupting");
+  }
+  delay(1000);
   lcd.clear();
-
 
 }
 
-void hold()
+void stop_setTo0()
 {
+  lcd.clear();
   count = 0;
+  button_val = 1;
+}
+
+void start_again()
+{
+  button_val = 0;
 }
 
 
