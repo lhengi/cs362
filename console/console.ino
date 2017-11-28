@@ -1,11 +1,8 @@
 //************************************************************
-// this is a simple example that uses the painlessMesh library
-//
-// 1. sends a silly message to every node on the mesh at a random time betweew 1 and 5 seconds
-// 2. prints anything it recieves to Serial.print
-//
+// This is console part**
 //
 //************************************************************
+
 #include "painlessMesh.h"
 #include <SPI.h>
 #include <Wire.h>
@@ -15,6 +12,8 @@
 #include <painlessMesh.h>
 #include <painlessMeshSync.h>
 #include <painlessScheduler.h>
+#include <Time.h>
+
 
 #define   MESH_PREFIX     "whateverYouLike"
 #define   MESH_PASSWORD   "somethingSneaky"
@@ -27,10 +26,9 @@
 Adafruit_SSD1306 display(OLED_RESET);
 const int type = 2;
 
-int firePin = 0;
-int doorPin = 2;
-int isFire = 0;
-int isDoor = 0;
+int alarm = 16;
+bool isFire = false;
+bool isDoor = false;
 
 int reading;
 float voltage;
@@ -40,6 +38,11 @@ int tempFint;
 int upPin = 14;
 int downPin = 12;
 int idealTemp = 65;
+
+int blrState = 0;
+
+int door_name = 0;
+String device_name = "Heng's room";
 
 #if (SSD1306_LCDHEIGHT != 64)
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
@@ -56,11 +59,36 @@ Task taskSendMessage( TASK_SECOND * 1 , TASK_FOREVER, &sendMessage );
 bool myLight = false;
 bool yourLight = false;
 
+
 void receivedCallback( uint32_t from, String &msg ) {
   Serial.printf("startHere: Received from %u msg=%s\n", from, msg.c_str());
   StaticJsonBuffer<200> jsonBuffer;
   JsonObject& myRequest = jsonBuffer.parseObject(msg);
-  myLight = int(myRequest["ledState"]);
+  int type_recived = int(myRequest["type"]);
+  if(type_recived == 1)
+  {
+    isFire = int(myRequest["data"]);
+    return;
+  }
+
+  if(type_recived == 3)
+  {
+    blrState = int(myRequest["data"]);
+    return;
+  }
+
+  if(type_recived == 4)
+  {
+    /*
+      door_name = int(myRequest["data"]);
+      if(door_name == device_name)
+      {
+        isDoor = 1;
+      }
+      */
+  }
+
+  
 }
 
 void newConnectionCallback(uint32_t nodeId) {
@@ -98,12 +126,13 @@ void setup() {
   display.setTextSize(3);
   display.setTextColor(WHITE);
   display.setTextSize(1);
-  pinMode(firePin,OUTPUT);
-  pinMode(doorPin,OUTPUT);
+  pinMode(alarm,OUTPUT);
+  digitalWrite(alarm,LOW);
   pinMode(upPin, INPUT_PULLUP);
   pinMode(downPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(upPin),upTemp,FALLING);
   attachInterrupt(digitalPinToInterrupt(downPin),downTemp,FALLING);
+  //setTime(now);
 }
 
 void changeLight(){
@@ -111,30 +140,101 @@ void changeLight(){
   return;
 }
 
+void doorBellRing()
+{
+  digitalWrite(alarm,HIGH);
+  delay(3000);
+  digitalWrite(alarm,LOW);
+  delay(2000);
+  
+}
+
+void fireAlarmOn()
+{
+  digitalWrite(alarm,HIGH);
+  testfillrect();
+}
+void fireAlarmOff()
+{
+  digitalWrite(alarm,LOW);
+}
+
+void testfillrect() {
+  uint8_t color = 1;
+  for (int16_t i=0; i<display.height()/2; i+=3) {
+    // alternate colors
+    display.fillRect(i, i, display.width()-i*2, display.height()-i*2, color%2);
+    display.display();
+    delay(1);
+    color++;
+  }
+}
+
+
 void loop() {
   mesh.update();
-  digitalWrite(LED, myLight);
+
   int tempF = getTemp();
+    
+    if(isFire)
+    {
+      fireAlarmOn();
+      return;
+      
+    }
+
+    if(!isFire)
+    {
+      fireAlarmOff();
+      
+    }
+    if(isDoor)
+    {
+      doorBellRing();
+      isDoor = 0;
+      
+    }
+    String blr_disState = "NA";
+    if(blrState == 1)
+    {
+      blr_disState = "ON";
+    }
+    else
+    {
+      blr_disState = "OFF";
+    }
     
     //Serial.println("Temp F");
     //Serial.println(tempF);
     display.clearDisplay();
     display.setTextSize(2);
     display.setCursor(0,0);
-    display.println(idealTemp);
+    display.print(idealTemp);
+    /*
+    display.setTextSize(1);
+    display.print("        BLR: ");
+    display.print(blr_disState);
+    display.setTextSize(2);
+    display.println();
+    */
+    display.println("     "+blr_disState);
+    
     display.setTextSize(6);
     //display.print(" ");
     display.print(tempF);
     display.display();
+
 }
 
 void upTemp()
 {
   //Serial.println("UpTemp called");
+  isFire = true; // *********** Testing
   idealTemp++;
 }
 void downTemp()
 {
+  isFire = false; // *************Testing
   idealTemp--;
 }
 
@@ -165,7 +265,7 @@ void sendMessage() {
   myRequest["data"] = getTemp();
   myRequest["device_id"] = ESP.getChipId();
   myRequest["type"] = 2;
-  myRequest["device_name"] = "Heng's twin tower";
+  myRequest["device_name"] = device_name;
   String request;
   myRequest.printTo(request);
   Serial.print("Sending: ");
