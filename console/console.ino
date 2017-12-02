@@ -12,12 +12,14 @@
 #include <painlessMesh.h>
 #include <painlessMeshSync.h>
 #include <painlessScheduler.h>
-#include <Time.h>
+#include <TimeLib.h>
 
 
 #define   MESH_PREFIX     "whateverYouLike"
 #define   MESH_PASSWORD   "somethingSneaky"
 #define   MESH_PORT       5555
+
+
 #define   BTN             12
 #define   LED             16
 
@@ -29,6 +31,7 @@ const int type = 2;
 int alarm = 16;
 bool isFire = false;
 bool isDoor = false;
+//bool isDoor = true;
 
 int reading;
 float voltage;
@@ -41,8 +44,11 @@ int idealTemp = 65;
 
 int blrState = 0;
 
-int door_name = 0;
+uint32_t door_id;
+time_t door_start = now();
+
 String device_name = "Heng's room";
+uint32_t device_id = ESP.getChipId();
 
 #if (SSD1306_LCDHEIGHT != 64)
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
@@ -79,13 +85,13 @@ void receivedCallback( uint32_t from, String &msg ) {
 
   if(type_recived == 4)
   {
-    /*
-      door_name = int(myRequest["data"]);
-      if(door_name == device_name)
+      door_id = uint32_t(myRequest["data"]);
+      if(door_id == device_id && isDoor == 0)
       {
         isDoor = 1;
+        door_start = now();
       }
-      */
+      
   }
 
   
@@ -160,6 +166,7 @@ void fireAlarmOff()
 }
 
 void testfillrect() {
+  Serial.println("Inside rect");
   uint8_t color = 1;
   for (int16_t i=0; i<display.height()/2; i+=3) {
     // alternate colors
@@ -168,8 +175,10 @@ void testfillrect() {
     delay(1);
     color++;
   }
+  delay(1000);
 }
 
+int door_counter = 0;
 
 void loop() {
   mesh.update();
@@ -188,12 +197,21 @@ void loop() {
       fireAlarmOff();
       
     }
-    if(isDoor)
+
+    // doorbell ring for 10 seconds
+    if(isDoor && (now() - door_start) < 10 )
     {
-      doorBellRing();
-      isDoor = 0;
+       //Serial.print("Now  ");
+       //Serial.println(now()-door_start);
+       digitalWrite(alarm,HIGH);
       
     }
+    else
+    {
+      isDoor = 0;
+      digitalWrite(alarm,LOW);
+    }
+    
     String blr_disState = "NA";
     if(blrState == 1)
     {
@@ -229,12 +247,15 @@ void loop() {
 void upTemp()
 {
   //Serial.println("UpTemp called");
-  isFire = true; // *********** Testing
+  //isFire = true; 
+  // *********** Testing
+  
   idealTemp++;
 }
 void downTemp()
 {
-  isFire = false; // *************Testing
+  //isFire = false;
+  // *************Testing
   idealTemp--;
 }
 
@@ -270,6 +291,7 @@ void sendMessage() {
   myRequest.printTo(request);
   Serial.print("Sending: ");
   Serial.println(request);
-  mesh.sendBroadcast( request );
+  if(!mesh.sendBroadcast( request ))
+    Serial.println("Message Failed");
   taskSendMessage.setInterval( random( TASK_SECOND * 1, TASK_SECOND * 5 ));
 }
